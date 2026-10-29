@@ -10,6 +10,296 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Milestone 1 will implement full relational entities:
-// User, Vendor, Product, PackagingUnit, Complaint, ComplaintEvidence,
-// Investigation, ComplaintEvent, CorrectiveAction, RecurringIssueAlert
+// -------------------------------------------------------------
+// ENUMS
+// -------------------------------------------------------------
+
+enum UserRole {
+  PASSENGER
+  QUALITY_REVIEWER
+  ADMIN
+}
+
+enum VendorStatus {
+  ACTIVE
+  SUSPENDED
+  UNDER_REVIEW
+}
+
+enum ProductCategory {
+  MEAL_TRAY
+  PACKAGED_WATER
+  SNACK_BOX
+  BEVERAGE
+  SPECIAL_DIET
+}
+
+enum PackagingStatus {
+  ACTIVE
+  EXPIRED
+  RECALLED
+}
+
+enum ComplaintCategory {
+  SPOILAGE
+  FOREIGN_OBJECT
+  HYGIENE_PACKAGING
+  TEMPERATURE
+  PRODUCT_MISMATCH
+  OTHER
+}
+
+enum ComplaintSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  INVESTIGATION
+  ACTION_REQUIRED
+  NEEDS_INFORMATION
+  RESOLVED
+  REJECTED
+  DUPLICATE
+}
+
+enum InvestigationDetermination {
+  UNSUBSTANTIATED
+  VENDOR_FAULT
+  STORAGE_FAULT
+  INCONCLUSIVE
+}
+
+enum CorrectiveActionType {
+  WARNING_LETTER
+  FINANCIAL_PENALTY
+  BATCH_RECALL
+  KITCHEN_AUDIT
+  STAFF_RETRAINING
+}
+
+enum CorrectiveActionStatus {
+  PENDING
+  IN_PROGRESS
+  VERIFIED_COMPLETE
+  OVERDUE
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  INVESTIGATED
+  DISMISSED
+}
+
+// -------------------------------------------------------------
+// MODELS
+// -------------------------------------------------------------
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  name         String
+  passwordHash String
+  role         UserRole    @default(QUALITY_REVIEWER)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  investigations  Investigation[]
+  complaintEvents ComplaintEvent[]
+
+  @@map("users")
+}
+
+model Vendor {
+  id           String       @id @default(uuid())
+  name         String
+  code         String       @unique
+  contactEmail String
+  contactPhone String?
+  licenseNumber String      // FSSAI or IRCTC authorization number
+  status       VendorStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  products             Product[]
+  recurringIssueAlerts RecurringIssueAlert[]
+
+  @@map("vendors")
+}
+
+model Product {
+  id             String          @id @default(uuid())
+  vendorId       String
+  vendor         Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name           String
+  category       ProductCategory
+  fssaiLicense   String
+  standardPrice  Decimal?        @db.Decimal(10, 2)
+  shelfLifeHours Int             @default(24)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  packagingUnits       PackagingUnit[]
+  recurringIssueAlerts RecurringIssueAlert[]
+
+  @@index([vendorId])
+  @@index([category])
+  @@map("products")
+}
+
+model PackagingUnit {
+  id               String          @id @default(uuid())
+  productId        String
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  batchNumber      String
+  packagingDate    DateTime
+  expiryDate       DateTime
+  qrCodeIdentifier String          @unique
+  status           PackagingStatus @default(ACTIVE)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  complaints Complaint[]
+
+  @@index([qrCodeIdentifier])
+  @@index([productId])
+  @@index([batchNumber])
+  @@map("packaging_units")
+}
+
+model Complaint {
+  id              String            @id @default(uuid())
+  complaintRef    String            @unique
+  trackingToken   String            // Cryptographic token to prevent ID enumeration
+  packagingUnitId String?
+  packagingUnit   PackagingUnit?    @relation(fields: [packagingUnitId], references: [id], onDelete: SetNull)
+  category        ComplaintCategory
+  severity        ComplaintSeverity @default(MEDIUM)
+  description     String            @db.Text
+  trainNumber     String?
+  journeyDate     DateTime?
+  coach           String?
+  contactEmail    String?
+  contactPhone    String?
+  status          ComplaintStatus   @default(SUBMITTED)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  evidence              ComplaintEvidence[]
+  events                ComplaintEvent[]
+  investigation         Investigation?
+  recurringAlertLinks   RecurringIssueAlertComplaint[]
+
+  @@index([complaintRef])
+  @@index([trackingToken])
+  @@index([packagingUnitId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@map("complaints")
+}
+
+model ComplaintEvidence {
+  id            String    @id @default(uuid())
+  complaintId   String
+  complaint     Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  storagePath   String    // Path in private object store (never public URL)
+  fileName      String
+  fileSizeBytes Int
+  mimeType      String
+  uploadedAt    DateTime  @default(now())
+
+  @@index([complaintId])
+  @@map("complaint_evidence")
+}
+
+model ComplaintEvent {
+  id             String    @id @default(uuid())
+  complaintId    String
+  complaint      Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole      String    // PASSENGER, QUALITY_REVIEWER, ADMIN, or SYSTEM
+  previousStatus String?
+  newStatus      String
+  explanation    String    @db.Text
+  isPublic       Boolean   @default(true) // Visible to passenger vs internal reviewer note
+  createdAt      DateTime  @default(now())
+
+  @@index([complaintId])
+  @@index([createdAt])
+  @@map("complaint_events")
+}
+
+model Investigation {
+  id             String                      @id @default(uuid())
+  complaintId    String                      @unique
+  complaint      Complaint                   @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  investigatorId String?
+  investigator   User?                       @relation(fields: [investigatorId], references: [id], onDelete: SetNull)
+  findings       String?                     @db.Text
+  determination  InvestigationDetermination?
+  isCompleted    Boolean                     @default(false)
+  assignedAt     DateTime                    @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime                    @updatedAt
+
+  correctiveActions CorrectiveAction[]
+
+  @@index([investigatorId])
+  @@map("investigations")
+}
+
+model CorrectiveAction {
+  id              String                 @id @default(uuid())
+  investigationId String
+  investigation   Investigation          @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  actionType      CorrectiveActionType
+  description     String                 @db.Text
+  deadline        DateTime?
+  status          CorrectiveActionStatus @default(PENDING)
+  createdAt       DateTime               @default(now())
+  verifiedAt      DateTime?
+
+  @@index([investigationId])
+  @@map("corrective_actions")
+}
+
+model RecurringIssueAlert {
+  id              String            @id @default(uuid())
+  vendorId        String?
+  vendor          Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  productId       String?
+  product         Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+  category        ComplaintCategory
+  triggerCount    Int               @default(3)
+  timeWindowHours Int               @default(48)
+  reason          String            @db.Text
+  status          AlertStatus       @default(OPEN)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  complaintLinks  RecurringIssueAlertComplaint[]
+
+  @@index([vendorId])
+  @@index([productId])
+  @@index([status])
+  @@map("recurring_issue_alerts")
+}
+
+model RecurringIssueAlertComplaint {
+  id          String              @id @default(uuid())
+  alertId     String
+  alert       RecurringIssueAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  complaintId String
+  complaint   Complaint           @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  createdAt   DateTime            @default(now())
+
+  @@unique([alertId, complaintId])
+  @@map("recurring_issue_alert_complaints")
+}
