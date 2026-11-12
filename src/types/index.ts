@@ -1,5 +1,7 @@
 import type {
   User,
+  Station,
+  Train,
   Vendor,
   Product,
   PackagingUnit,
@@ -9,6 +11,7 @@ import type {
   Investigation,
   CorrectiveAction,
   RecurringIssueAlert,
+  RecurringIssueAlertComplaint,
   UserRole,
   VendorStatus,
   ProductCategory,
@@ -24,6 +27,8 @@ import type {
 
 export type {
   User,
+  Station,
+  Train,
   Vendor,
   Product,
   PackagingUnit,
@@ -33,6 +38,7 @@ export type {
   Investigation,
   CorrectiveAction,
   RecurringIssueAlert,
+  RecurringIssueAlertComplaint,
   UserRole,
   VendorStatus,
   ProductCategory,

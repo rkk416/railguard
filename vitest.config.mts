@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    include: ["src/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+    exclude: ["**/node_modules/**", "**/railguardworkingcc/**", "**/.git/**"],
   },
   resolve: {
     alias: {

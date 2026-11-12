@@ -1,13 +1,15 @@
-// RailGuard Prisma Schema
-// Database Engine: PostgreSQL
+// RailGuard Prisma Schema — Phase 4A
+// Database Engine: PostgreSQL 18 (local dev) / PostgreSQL 16+ (production)
+// Last Updated: Phase 4A — Database Enhancement & Synthetic Data Engine
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // -------------------------------------------------------------
@@ -15,7 +17,6 @@ datasource db {
 // -------------------------------------------------------------
 
 enum UserRole {
-  PASSENGER
   QUALITY_REVIEWER
   ADMIN
 }
@@ -82,11 +83,15 @@ enum CorrectiveActionType {
   STAFF_RETRAINING
 }
 
+// OVERDUE is intentionally NOT a stored enum value.
+// Overdue status is DERIVED at query time:
+//   status IN (PENDING, IN_PROGRESS) AND deadline < now()
 enum CorrectiveActionStatus {
   PENDING
   IN_PROGRESS
   VERIFIED_COMPLETE
-  OVERDUE
+  NON_COMPLIANT
+  ESCALATED
 }
 
 enum AlertStatus {
@@ -100,41 +105,81 @@ enum AlertStatus {
 // MODELS
 // -------------------------------------------------------------
 
+// Authorized railway personnel only. Passengers do NOT have accounts.
 model User {
-  id           String      @id @default(uuid())
-  email        String      @unique
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
   name         String
   passwordHash String
-  role         UserRole    @default(QUALITY_REVIEWER)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  role         UserRole @default(QUALITY_REVIEWER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  investigations  Investigation[]
-  complaintEvents ComplaintEvent[]
+  investigations    Investigation[]
+  complaintEvents   ComplaintEvent[]
+  verifiedActions   CorrectiveAction[]  @relation("VerifiedBy")
+  deletedComplaints Complaint[]         @relation("DeletedBy")
 
   @@map("users")
 }
 
+// Indian Railways stations — boarding points, transit stops, base kitchen loading sites
+model Station {
+  id       String @id @default(uuid()) @db.Uuid
+  code     String @unique // e.g. NDLS, MMCT, HWH
+  name     String // e.g. New Delhi, Mumbai Central
+  division String // e.g. Delhi, Mumbai
+  zone     String // e.g. Northern Railway, Western Railway
+  createdAt DateTime @default(now())
+
+  originTrains      Train[]     @relation("OriginStation")
+  destTrains        Train[]     @relation("DestinationStation")
+  complaints        Complaint[]
+
+  @@index([code])
+  @@map("stations")
+}
+
+// Scheduled passenger trains
+model Train {
+  id                   String  @id @default(uuid()) @db.Uuid
+  trainNumber          String  @unique // e.g. 12951
+  trainName            String  // e.g. Mumbai Rajdhani Express
+  originStationId      String  @db.Uuid
+  originStation        Station @relation("OriginStation", fields: [originStationId], references: [id], onDelete: Restrict)
+  destinationStationId String  @db.Uuid
+  destinationStation   Station @relation("DestinationStation", fields: [destinationStationId], references: [id], onDelete: Restrict)
+  createdAt            DateTime @default(now())
+
+  complaints Complaint[]
+
+  @@index([trainNumber])
+  @@map("trains")
+}
+
+// Catering companies, base kitchen operators, or pantry contractors
 model Vendor {
-  id           String       @id @default(uuid())
-  name         String
-  code         String       @unique
-  contactEmail String
-  contactPhone String?
-  licenseNumber String      // FSSAI or IRCTC authorization number
-  status       VendorStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String       @id @default(uuid()) @db.Uuid
+  name          String
+  code          String       @unique // e.g. VND-NR-001
+  contactEmail  String
+  contactPhone  String?
+  licenseNumber String       // FSSAI or IRCTC authorization number
+  status        VendorStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   products             Product[]
   recurringIssueAlerts RecurringIssueAlert[]
 
+  @@index([code])
   @@map("vendors")
 }
 
+// Approved menu items or packaged goods
 model Product {
-  id             String          @id @default(uuid())
-  vendorId       String
+  id             String          @id @default(uuid()) @db.Uuid
+  vendorId       String          @db.Uuid
   vendor         Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   name           String
   category       ProductCategory
@@ -152,9 +197,10 @@ model Product {
   @@map("products")
 }
 
+// Individual batch/packaging units with QR code identifiers
 model PackagingUnit {
-  id               String          @id @default(uuid())
-  productId        String
+  id               String          @id @default(uuid()) @db.Uuid
+  productId        String          @db.Uuid
   product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   batchNumber      String
   packagingDate    DateTime
@@ -172,43 +218,62 @@ model PackagingUnit {
   @@map("packaging_units")
 }
 
+// Passenger complaint records
+// Passengers do NOT have accounts — submissions are anonymous with token-based tracking
 model Complaint {
-  id              String            @id @default(uuid())
-  complaintRef    String            @unique
-  trackingToken   String            // Cryptographic token to prevent ID enumeration
-  packagingUnitId String?
-  packagingUnit   PackagingUnit?    @relation(fields: [packagingUnitId], references: [id], onDelete: SetNull)
-  category        ComplaintCategory
-  severity        ComplaintSeverity @default(MEDIUM)
-  description     String            @db.Text
-  trainNumber     String?
-  journeyDate     DateTime?
-  coach           String?
-  contactEmail    String?
-  contactPhone    String?
-  status          ComplaintStatus   @default(SUBMITTED)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                 String            @id @default(uuid()) @db.Uuid
+  complaintRef       String            @unique   // Human-readable ref e.g. RG-2026-001234
+  trackingTokenHash  String            @unique   // SHA-256 hash of raw tracking token (raw token shown to passenger only once, never stored)
+  packagingUnitId    String?           @db.Uuid
+  packagingUnit      PackagingUnit?    @relation(fields: [packagingUnitId], references: [id], onDelete: SetNull)
+  // Train relationship: primary FK, with fallback for unrecognized train numbers
+  trainId            String?           @db.Uuid
+  train              Train?            @relation(fields: [trainId], references: [id], onDelete: SetNull)
+  unmatchedTrainNumber String?         // Set when passenger's train number doesn't match any Train record
+  // Incident station
+  stationId          String?           @db.Uuid
+  station            Station?          @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  category           ComplaintCategory
+  severity           ComplaintSeverity @default(MEDIUM)
+  description        String            @db.Text
+  journeyDate        DateTime?
+  coach              String?
+  contactEmail       String?
+  contactPhone       String?
+  status             ComplaintStatus   @default(SUBMITTED)
+  // Rejection documentation
+  rejectionReason    String?           @db.Text
+  // Soft deletion — only ADMIN may soft-delete; Restrict prevents deletion of investigated complaints
+  deletedAt          DateTime?
+  deletedReason      String?           @db.Text
+  deletedById        String?           @db.Uuid
+  deletedBy          User?             @relation("DeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  evidence              ComplaintEvidence[]
-  events                ComplaintEvent[]
-  investigation         Investigation?
-  recurringAlertLinks   RecurringIssueAlertComplaint[]
+  evidence            ComplaintEvidence[]
+  events              ComplaintEvent[]
+  investigation       Investigation?
+  recurringAlertLinks RecurringIssueAlertComplaint[]
 
   @@index([complaintRef])
-  @@index([trackingToken])
+  @@index([trackingTokenHash])
   @@index([packagingUnitId])
+  @@index([trainId])
+  @@index([stationId])
   @@index([status])
   @@index([category])
   @@index([createdAt])
+  @@index([deletedAt])
   @@map("complaints")
 }
 
+// Uploaded evidence files — stored at private filesystem paths, never public URLs
 model ComplaintEvidence {
-  id            String    @id @default(uuid())
-  complaintId   String
+  id            String    @id @default(uuid()) @db.Uuid
+  complaintId   String    @db.Uuid
   complaint     Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
-  storagePath   String    // Path in private object store (never public URL)
+  storagePath   String    // Relative path in private evidence_storage/ — never a public URL
   fileName      String
   fileSizeBytes Int
   mimeType      String
@@ -218,17 +283,18 @@ model ComplaintEvidence {
   @@map("complaint_evidence")
 }
 
+// Append-only audit log — never updated or deleted through application APIs
 model ComplaintEvent {
-  id             String    @id @default(uuid())
-  complaintId    String
+  id             String    @id @default(uuid()) @db.Uuid
+  complaintId    String    @db.Uuid
   complaint      Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
-  actorId        String?
+  actorId        String?   @db.Uuid
   actor          User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorRole      String    // PASSENGER, QUALITY_REVIEWER, ADMIN, or SYSTEM
   previousStatus String?
   newStatus      String
   explanation    String    @db.Text
-  isPublic       Boolean   @default(true) // Visible to passenger vs internal reviewer note
+  isPublic       Boolean   @default(true) // true = visible to passenger; false = internal reviewer note
   createdAt      DateTime  @default(now())
 
   @@index([complaintId])
@@ -236,18 +302,20 @@ model ComplaintEvent {
   @@map("complaint_events")
 }
 
+// Investigation record — onDelete: Restrict prevents complaint deletion while investigation exists
 model Investigation {
-  id             String                      @id @default(uuid())
-  complaintId    String                      @unique
-  complaint      Complaint                   @relation(fields: [complaintId], references: [id], onDelete: Cascade)
-  investigatorId String?
-  investigator   User?                       @relation(fields: [investigatorId], references: [id], onDelete: SetNull)
-  findings       String?                     @db.Text
+  id             String                     @id @default(uuid()) @db.Uuid
+  complaintId    String                     @unique @db.Uuid
+  complaint      Complaint                  @relation(fields: [complaintId], references: [id], onDelete: Restrict)
+  investigatorId String?                    @db.Uuid
+  investigator   User?                      @relation(fields: [investigatorId], references: [id], onDelete: SetNull)
+  // findings is append-only in practice; reopening prepends a header
+  findings       String?                    @db.Text
   determination  InvestigationDetermination?
-  isCompleted    Boolean                     @default(false)
-  assignedAt     DateTime                    @default(now())
+  isCompleted    Boolean                    @default(false)
+  assignedAt     DateTime                   @default(now())
   completedAt    DateTime?
-  updatedAt      DateTime                    @updatedAt
+  updatedAt      DateTime                   @updatedAt
 
   correctiveActions CorrectiveAction[]
 
@@ -255,26 +323,34 @@ model Investigation {
   @@map("investigations")
 }
 
+// Corrective actions linked to investigations
+// OVERDUE is NOT stored as a status — it is derived: status IN (PENDING, IN_PROGRESS) AND deadline < now()
 model CorrectiveAction {
-  id              String                 @id @default(uuid())
-  investigationId String
-  investigation   Investigation          @relation(fields: [investigationId], references: [id], onDelete: Cascade)
-  actionType      CorrectiveActionType
-  description     String                 @db.Text
-  deadline        DateTime?
-  status          CorrectiveActionStatus @default(PENDING)
-  createdAt       DateTime               @default(now())
-  verifiedAt      DateTime?
+  id                 String                 @id @default(uuid()) @db.Uuid
+  investigationId    String                 @db.Uuid
+  investigation      Investigation          @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  actionType         CorrectiveActionType
+  description        String                 @db.Text
+  responsibleParty   String?               // Vendor name, department, or team responsible
+  deadline           DateTime?
+  status             CorrectiveActionStatus @default(PENDING)
+  completionEvidence String?               @db.Text // Textual or file-path reference to completion proof
+  verificationOutcome String?              @db.Text // Notes on verification pass/fail
+  verifiedAt         DateTime?
+  verifiedById       String?               @db.Uuid
+  verifiedBy         User?                 @relation("VerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime              @default(now())
 
   @@index([investigationId])
   @@map("corrective_actions")
 }
 
+// Recurring issue alerts — triggered when threshold complaint counts are reached
 model RecurringIssueAlert {
-  id              String            @id @default(uuid())
-  vendorId        String?
+  id              String            @id @default(uuid()) @db.Uuid
+  vendorId        String?           @db.Uuid
   vendor          Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  productId       String?
+  productId       String?           @db.Uuid
   product         Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
   category        ComplaintCategory
   triggerCount    Int               @default(3)
@@ -284,7 +360,7 @@ model RecurringIssueAlert {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  complaintLinks  RecurringIssueAlertComplaint[]
+  complaintLinks RecurringIssueAlertComplaint[]
 
   @@index([vendorId])
   @@index([productId])
@@ -292,11 +368,12 @@ model RecurringIssueAlert {
   @@map("recurring_issue_alerts")
 }
 
+// Join table linking recurring alerts to their triggering complaints
 model RecurringIssueAlertComplaint {
-  id          String              @id @default(uuid())
-  alertId     String
+  id          String              @id @default(uuid()) @db.Uuid
+  alertId     String              @db.Uuid
   alert       RecurringIssueAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
-  complaintId String
+  complaintId String              @db.Uuid
   complaint   Complaint           @relation(fields: [complaintId], references: [id], onDelete: Cascade)
   createdAt   DateTime            @default(now())
 

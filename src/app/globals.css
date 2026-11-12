@@ -1,26 +1,176 @@
+/* Google Fonts — editorial serif + IBM Plex Sans/Mono */
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
+/* ============================================================
+   RAILGUARD — The Living Inspection Register
+   Design System: Swiss Modernist × Indian Railway Heritage
+   ============================================================ */
+
+/* Design tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --rail-ink: #252d2b;
+  --archive-paper: #f0ede4;
+  --signal-red: #c65f48;
+  --jade: #527c72;
+  --brass: #b28d55;
+  --paper-mid: #e4e0d4;
+  --ink-muted: #4a5250;
+  --ink-faint: #8a9490;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-rail-ink: var(--rail-ink);
+  --color-paper: var(--archive-paper);
+  --color-signal-red: var(--signal-red);
+  --color-jade: var(--jade);
+  --color-brass: var(--brass);
+  --color-paper-mid: var(--paper-mid);
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Base reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--archive-paper);
+  color: var(--rail-ink);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography helpers */
+.font-serif { font-family: "Playfair Display", Georgia, serif; }
+.font-sans  { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+.font-mono  { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+/* Route line decorative element */
+.route-line {
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, var(--jade) 0%, var(--brass) 50%, var(--signal-red) 100%);
+  border-radius: 1px;
+}
+
+/* Station dot marker */
+.station-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: var(--archive-paper);
+}
+
+/* Inspection stamp */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--jade);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--jade);
+  transform: rotate(-1.5deg);
+  opacity: 0.85;
+}
+
+/* Register entry rows */
+.register-row {
+  border-bottom: 1px solid var(--paper-mid);
+  transition: background-color 0.1s ease;
+}
+.register-row:hover {
+  background-color: rgba(82, 124, 114, 0.04);
+}
+
+/* Status badge variants */
+.badge-submitted { background: #e8f4f1; color: #2d6a5e; border-color: #b8ddd6; }
+.badge-review    { background: #fef9ec; color: #7a5c1a; border-color: #f0d99a; }
+.badge-invest    { background: #ebe8f4; color: #4a3d7a; border-color: #c4b8e8; }
+.badge-action    { background: #fdf0ec; color: #7a2c1a; border-color: #f0b8a8; }
+.badge-resolved  { background: #e8f4ec; color: #1a5c2d; border-color: #a8d8b8; }
+.badge-rejected  { background: #f4e8e8; color: #5c1a1a; border-color: #d8a8a8; }
+
+/* Animated route line for hero */
+@keyframes route-draw {
+  from { stroke-dashoffset: 1200; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes train-move {
+  from { transform: translateX(-60px); }
+  to   { transform: translateX(0px); }
+}
+@keyframes cloud-drift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(12px); }
+}
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes stamp-appear {
+  from { opacity: 0; transform: scale(1.2) rotate(-2deg); }
+  to   { opacity: 1; transform: scale(1) rotate(-1.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* SVG route line draw animation */
+.route-svg-line {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: route-draw 2.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Hover card lift */
+.card-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 45, 43, 0.1);
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--jade);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Paper texture overlay — very subtle */
+.paper-bg {
+  background-color: var(--archive-paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23f0ede4'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%23e4e0d4' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* Ink background for sidebar / control room */
+.ink-bg {
+  background-color: var(--rail-ink);
 }

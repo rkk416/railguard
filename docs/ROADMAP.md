@@ -21,50 +21,58 @@ This roadmap defines the sequential progression of RailGuard over an iterative 1
 - [x] Baseline smoke test verifying runner and path alias resolution.
 - [x] Complete repository and agent documentation (`AGENTS.md`, `docs/*`).
 
-### Milestone 1 — Data & Product Registration (Days 3–4) — [NEXT]
-- [ ] Implement full relational Prisma schema in `prisma/schema.prisma`:
-  - Entities: `User`, `Vendor`, `Product`, `PackagingUnit`, `Complaint`, `ComplaintEvidence`, `Investigation`, `ComplaintEvent`, `CorrectiveAction`, `RecurringIssueAlert`.
-- [ ] Implement database seeder (`prisma/seed.ts`) with realistic demonstration caterers, pantry products, and active packaging batches.
-- [ ] Build server-side product lookup service (`src/services/productService.ts`).
-- [ ] Build packaging QR code generator utility (`src/lib/qr/generator.ts`).
-- [ ] Build public product verification view (`/products/[id]`).
-- [ ] Unit tests for valid, expired, and unrecognised packaging lookups (`src/tests/product.test.ts`).
+### Milestone 1 — Data & Product Registration (Days 3–4) — [COMPLETED]
+- [x] Implement full relational Prisma schema in `prisma/schema.prisma`:
+  - Entities: `User`, `Station`, `Train`, `Vendor`, `Product`, `PackagingUnit`, `Complaint`, `ComplaintEvidence`, `Investigation`, `ComplaintEvent`, `CorrectiveAction`, `RecurringIssueAlert`.
+- [x] Implement database seeder (`prisma/seed.ts`) with realistic demonstration caterers, pantry products, active packaging batches, stations, and trains.
+- [x] Build server-side product lookup service (`src/services/productService.ts`).
+- [x] Build packaging QR code generator utility (`src/lib/qr/generator.ts`).
+- [x] Build public product verification view (`/products/[id]`).
+- [x] Unit tests for valid, expired, and unrecognised packaging lookups (`src/tests/product.test.ts`).
 
-### Milestone 2 — Passenger Reporting Flow (Days 5–6)
-- [ ] Mobile-first responsive passenger reporting form (`/report?p=<qrCode>`).
-- [ ] Zod schema validation for passenger submissions (`src/lib/validation/complaint.ts`).
-- [ ] Client photo upload component with preview and size/format validation.
-- [ ] Evidence upload handler and private storage abstraction (`src/lib/storage/*`).
-- [ ] Unique complaint reference generator (`RG-YYYY-XXXXX`) and cryptographic tracking token generation.
-- [ ] Submission confirmation view with printable/savable tracking card.
-- [ ] Unit & integration tests for complaint submission and upload validation.
+### Milestone 2 — Passenger Reporting Flow (Days 5–6) — [COMPLETED]
+- [x] Mobile-first responsive passenger reporting form (`/report?p=<qrCode>`).
+- [x] Zod schema validation for passenger submissions (`src/app/api/complaints/route.ts`).
+- [x] Client photo upload component with preview and size/format validation.
+- [x] Evidence upload handler with binary signature checks and private storage abstraction.
+- [x] Unique complaint reference generator (`RG-YYYY-XXXX`) and cryptographic tracking token generation.
+- [x] Submission confirmation view with savable tracking token and one-time notice.
+- [x] Unit & integration tests for complaint submission and upload validation (`src/tests/complaintSubmission.test.ts`).
 
-### Milestone 3 — Authentication & Operational Dashboard (Days 7–8)
-- [ ] Secure server-enforced authentication and session handling (`src/lib/auth/*`).
-- [ ] Role-based access control middleware for `/dashboard/*` routes.
-- [ ] Reviewer dashboard overview page with operational KPIs (Active Cases, Urgent Spoilage, Overdue Investigations).
-- [ ] Interactive case table with multi-parameter filtering (status, category, vendor, date).
-- [ ] Initial status transition controls for case reviewers.
-- [ ] Unit tests for RBAC enforcement and unauthorized route interception.
+### Milestone 3 — Authentication & Operational Dashboard (Days 7–8) — [COMPLETED]
+- [x] Secure server-enforced authentication and session handling (`src/lib/auth/session.ts`).
+- [x] Role-based access control guards for reviewer and admin operations.
+- [x] Control Room dashboard overview page with operational KPIs (Active Cases, Urgent Spoilage, Overdue Investigations, Overdue Actions, Compliance Rate).
+- [x] Interactive case table with multi-parameter filtering (status, category, search, sorting, pagination).
+- [x] Permitted status transition controls for case reviewers.
+- [x] Unit tests for RBAC enforcement and unauthorized route interception (`src/tests/rbacPermissions.test.ts`).
 
-### Milestone 4 — Investigation Workflow & Passenger Tracking (Days 9–10)
-- [ ] Case detail view (`/dashboard/complaints/[id]`) with presigned evidence image viewer.
-- [ ] Investigator assignment and official findings documentation.
-- [ ] Corrective action tracking with deadlines and compliance status.
-- [ ] Append-only event history logging on every state mutation.
-- [ ] Public passenger tracking portal (`/track`) requiring `complaintRef` + `trackingToken`.
-- [ ] Segregated timeline view hiding internal reviewer notes.
+### Milestone 4 — Investigation Workflow & Passenger Tracking (Days 9–10) — [COMPLETED]
+- [x] Case detail view (`/dashboard/complaints/[id]`) with authenticated evidence streaming proxy.
+- [x] Investigator assignment and official findings documentation with determination enums.
+- [x] Corrective action tracking with deadlines, responsible vendor, and compliance status.
+- [x] Append-only event history logging on every state mutation (`ComplaintEvent` records).
+- [x] Public passenger tracking portal (`/track`) requiring `complaintRef` + `trackingToken` via POST body.
+- [x] Segregated timeline view strictly hiding internal reviewer notes and contact details.
 
-### Milestone 5 — Recurring-Issue Rules & Operational Analytics (Days 11–12)
-- [ ] Rule-based recurring issue detection engine (`src/services/recurringIssueService.ts`):
-  - Threshold alerts for vendors, batches, and specific categories.
-- [ ] Supervisor recurring-issue alerts review panel in dashboard.
-- [ ] Operational trend charts (category distribution, complaint volume over time) using Recharts.
-- [ ] Duplicate complaint flagging logic.
+### Milestone 5 — Recurring-Issue Rules & Operational Analytics (Days 11–12) — [COMPLETED]
+- [x] Rule-based recurring issue detection engine (`src/services/recurringAlertService.ts`):
+  - Threshold alerts for vendors, batches, and categories (3+ cases in 48h).
+- [x] Supervisor recurring-issue alerts review panel in dashboard (`RecurringAlertsPanel.tsx`).
+- [x] Operational analytics & trend visualizations (`OperationalAnalyticsView.tsx`).
+- [x] Duplicate complaint correlation and flagging logic (`duplicateDetectionService.ts`).
 
-### Milestone 6 — Testing, Hardening & Deployment (Days 13–14)
-- [ ] Full end-to-end user journey verification.
-- [ ] Security audit: Rate limiting, header security, CSRF protection, error masking.
-- [ ] Performance profiling and build optimization.
-- [ ] Deployment runbook for Vercel + managed PostgreSQL (Supabase).
-- [ ] Demonstration walk-through script and final project handoff report.
+### Milestone 6 — Testing, Hardening & Deployment (Days 13–14) — [COMPLETED]
+- [x] Full end-to-end user journey verification (`scripts/e2eAcceptanceAudit.ts`).
+- [x] Security audit: Rate limiting, short-lived evidence token auth, security headers, anti-enumeration error masking.
+- [x] Performance profiling and production build verification (`npm run build`).
+- [x] Deployment guide for Vercel + managed PostgreSQL (`docs/DEPLOYMENT.md`).
+- [x] Demonstration walk-through guide and final project handoff report (`docs/DEMO_GUIDE.md`).
+
+### Final Delivery — The Living Inspection Register (Design System & Error Resolution) — [COMPLETED]
+- [x] Unified aesthetic direction: **The Living Inspection Register** (Swiss modernist typography + Indian railway heritage).
+- [x] Color palette: Rail Ink (`#252D2B`), Archive Paper (`#F0EDE4`), Signal Red (`#C65F48`), Jade (`#527C72`), Brass (`#B28D55`).
+- [x] Distinctive scenic railway journey hero illustration with animated route line, passing train, drifting clouds, and certified inspection seal.
+- [x] Database resilience: Graceful error boundaries preventing unhandled `PrismaClientInitializationError` when PostgreSQL is offline.
+- [x] Complete error audit across all 19 App Router routes and API handlers.
+- [x] Verified full suite: `npm test` (79/79 pass), `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors), `npm run build` (19 routes compiled).

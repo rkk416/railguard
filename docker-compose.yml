@@ -1,0 +1,33 @@
+# RailGuard — Local PostgreSQL 16 for Docker users
+# Usage: docker compose up -d
+# Then: DATABASE_URL="postgresql://railguard:railguard_dev@localhost:5432/railguard?schema=public"
+#
+# If you are on Windows without Docker, run PostgreSQL 16+ natively and
+# point DATABASE_URL to your local instance.
+
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: railguard_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: railguard
+      POSTGRES_USER: railguard
+      POSTGRES_PASSWORD: railguard_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - railguard_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U railguard -d railguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  railguard_pgdata:
+    driver: local

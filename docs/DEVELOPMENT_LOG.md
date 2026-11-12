@@ -66,3 +66,29 @@
    - Verified clean ESLint check (`npm run lint`), clean TypeScript check (`npx tsc --noEmit`), and clean production build (`npm run build`).
 
 ---
+
+
+## [2026-11-12] Final Engineering Phase: Production Readiness & GitHub Publication Preparation
+
+### Activities & Changes:
+1. **Repository Security & Vulnerability Audit**:
+   - Fixed Critical Security Risk: Removed unauthorized `x-user-email` request header resolution in `src/lib/auth/session.ts` which allowed arbitrary client-side role and identity spoofing. Authenticated identity now strictly relies on the server-issued `railguard_session` cookie or `x-admin-key`.
+   - Fixed High Risk: Corrected evidence URL generation in `src/components/passenger/ComplaintTrackingPortal.tsx` to use the scoped 15-minute HMAC-SHA256 `ev.streamUrl` instead of appending raw `trackingToken` to the image query parameters.
+   - Fixed High Risk: Added path traversal defense-in-depth in `src/app/api/evidence/[id]/route.ts` using `path.resolve` and strict prefix verification against `basePath`.
+   - Added Production Safety Guard: Enforced lockout of demonstration reset endpoints (`src/app/api/demo/reset/route.ts` and `src/services/demoResetService.ts`) in `NODE_ENV === "production"` unless `ALLOW_DEMO_RESET="true"` is explicitly enabled.
+   - Crypto Secret Unification: Added `process.env.AUTH_SECRET` to evidence HMAC secret resolver in `src/lib/crypto/token.ts`.
+2. **Production Headers & Configuration**:
+   - Configured strict production HTTP security headers in `next.config.ts` (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `X-DNS-Prefetch-Control: on`).
+   - Added `"postinstall": "prisma generate"` to `package.json` for seamless zero-config Vercel deployments.
+3. **Repository Cleanup**:
+   - Removed duplicate/backup directories `railguardworkingcc/` and `review/` (~1.9 GB of duplicate node_modules and builds).
+   - Removed personal IDE folder `.idea/`.
+   - Updated `.gitignore` to explicitly ignore `.idea/`, `review/`, `railguardworkingcc*`, and `*.log`.
+   - Updated `.env.example` with comprehensive variable specifications and production secrets guidance.
+   - Rewrote `README.md` to publication-grade standard with architecture diagrams, security models, local setup steps, and Vercel + Neon deployment instructions.
+4. **Verification**:
+   - Vitest: 79/79 passed in 1.16s across 17 test files.
+   - ESLint: 0 errors, 0 warnings.
+   - TypeScript: 0 errors (`npx tsc --noEmit`).
+   - Production Build: 19 routes generated cleanly in Next.js webpack mode.
+   - Live DB E2E: 100% passed on PostgreSQL port 5433.

@@ -20,6 +20,12 @@
 # production
 /build
 
+# backups / archives
+railguardworkingcc*
+review/
+.idea/
+*.log
+
 # misc
 .DS_Store
 *.pem
@@ -30,13 +36,20 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files (all local secrets)
 .env
+.env.local
 .env*.local
 .env.development
 .env.test
 .env.production
 !.env.example
+
+# Local PostgreSQL cluster (dev only, trust auth)
+.pgdata/
+
+# Local evidence storage (private — never serve publicly)
+evidence_storage/
 
 # vercel
 .vercel

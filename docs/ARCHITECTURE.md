@@ -4,103 +4,148 @@
 
 ## 1. System Overview
 
-RailGuard is a full-stack railway food quality audit and passenger feedback platform built on **Next.js 16 (App Router)**, **TypeScript**, **PostgreSQL**, and **Prisma ORM**.
+RailGuard is a full-stack railway food quality audit and passenger feedback platform built on **Next.js 16 (App Router)**, **TypeScript strict mode**, and **Prisma ORM** powered by **PostgreSQL 16**.
 
 The system addresses two primary stakeholders:
-1. **Passengers (Mobile-first public interface)**: Scan QR codes on authorized food packaging, verify product records, submit structured hygiene/spoilage complaints with photographs, and track resolution timelines securely.
-2. **Quality Reviewers & Administrators (Desktop operational dashboard)**: Monitor incoming allegations, examine photographic evidence, assign investigations, record official findings, track corrective actions, and analyze automated recurring-issue alerts.
+1. **Passengers (Mobile-first public interface)**: Scan QR codes on registered food packaging, view accurate batch status, submit structured hygiene/spoilage complaints with photographs anonymously without account creation, and track resolution timelines securely via dual-key validation.
+2. **Quality Reviewers & Administrators (Desktop operational control room)**: Monitor incoming allegations, examine photographic evidence via secure proxy streams, assign investigations, record official findings, track corrective actions, and analyze automated recurring-issue alerts.
 
 ---
 
-## 2. Architecture Diagram
+## 2. Server vs. Client Boundary & Architecture Layers
+
+To ensure security invariants, zero credential leakage, and eliminate code duplication, RailGuard establishes strict architectural boundaries:
 
 ```mermaid
 flowchart TD
-    subgraph Passenger["Passenger (Mobile First)"]
-        A1["QR Scan on Packaging"] --> A2["Verify Product Record (/products/:id)"]
-        A2 --> A3["Submit Complaint Form (/report?p=...)"]
-        A3 --> A4["Upload Photo Evidence"]
-        A3 --> A5["Receive Complaint Ref + Token"]
-        A5 --> A6["Track Resolution Timeline (/track)"]
+    subgraph ClientLayer["Client Layer (Browser)"]
+        UI_Pass["Passenger Forms & Scanner ('use client')"]
+        UI_Dash["Reviewer Workspace & Dossier ('use client')"]
     end
 
-    subgraph AppServer["Next.js 16 App Server"]
-        B1["Public Route Handlers & RSC"]
-        B2["Zod Schema Validation Engine"]
-        B3["Server Actions / Business Logic"]
-        B4["Auth & RBAC Middleware"]
-        B5["Recurring Pattern Detection Service"]
-        B6["Storage Service (Signed URLs)"]
+    subgraph Entrypoints["Next.js Entrypoint Layer"]
+        RSC["React Server Components (RSC - Data Fetching)"]
+        SA["Server Actions (src/app/actions/*)"]
+        RH["Route Handlers (src/app/api/*)"]
     end
 
-    subgraph OperationalReviewer["Quality Reviewer & Admin"]
-        C1["Secure Dashboard (/dashboard)"]
-        C2["Evidence Inspector (Signed URLs)"]
-        C3["Investigation & Finding Workflow"]
-        C4["Corrective Action Tracker"]
-        C5["Recurring-Issue Alerts & Analytics"]
+    subgraph ServiceLayer["Reusable Domain Service Layer (src/services/*)"]
+        S_Complaint["complaintService"]
+        S_Invest["investigationService"]
+        S_Product["productService"]
+        S_Recurring["recurringIssueService"]
+        S_Analytics["analyticsService"]
+        S_Auth["authService"]
+        S_Storage["evidenceStorageService"]
     end
 
-    subgraph StorageLayer["Data & Evidence Infrastructure"]
-        D1[("PostgreSQL Database via Prisma")]
-        D2[("Private Object Storage - Supabase / S3")]
+    subgraph DataLayer["Persistence & Infrastructure"]
+        DB[("PostgreSQL 16 Database via Prisma")]
+        Storage[("Private Evidence Directory (storage/evidence)")]
     end
 
-    A2 -->|GET| B1
-    A3 -->|POST| B2
-    B2 --> B3
-    B3 -->|Write Complaint & Event| D1
-    A4 -->|Stream Upload| B6
-    B6 -->|Encrypted Blob| D2
+    UI_Pass -->|Multipart Upload| RH
+    UI_Pass -->|View Status| RSC
+    UI_Dash -->|Form Mutations / Transitions| SA
+    UI_Dash -->|View Pages & Dossiers| RSC
 
-    C1 -->|Authenticated Session| B4
-    B4 --> C2 & C3 & C4 & C5
-    C3 -->|Update Status & History| D1
-    C2 -->|Request Short-Lived URL| B6
-    B6 -->|Generate Presigned URL| D2
-    B5 -->|Scan Trends| D1
+    RSC --> ServiceLayer
+    SA --> ServiceLayer
+    RH --> ServiceLayer
+
+    ServiceLayer -->|Prisma Transactions| DB
+    ServiceLayer -->|Signed Read / Write| Storage
 ```
 
----
+### Responsibility Breakdown:
 
-## 3. Server vs. Client Boundary
-
-To optimize performance and eliminate client-side credential exposure:
-
-| Component Type | Primary Location | Responsibility |
+| Layer | Files | Responsibilities |
 |---|---|---|
-| **Server Components (RSC)** | `src/app/**/page.tsx`, `src/app/**/layout.tsx` | Data fetching, database access, session resolution, initial HTML rendering, zero bundle bloat |
-| **Client Components (`"use client"`)** | `src/components/passenger/*`, `src/components/dashboard/*`, `src/components/ui/*` | Form interactivity, camera/file upload previews, interactive search/filtering, modal dialogs, charts |
-| **Server Actions / Route Handlers** | `src/app/api/*`, `src/services/*` | Zod validation, authenticated database transactions, private storage communication |
+| **Server Components (RSC)** | `src/app/**/page.tsx`, `layout.tsx` | Secure server-side data loading, session extraction, initial rendering, zero bundle bloat. |
+| **Server Actions** | `src/app/actions/*` | Form mutations originating directly from UI components (status transitions, investigator assignments, findings, corrective actions, demo resets, login/logout). |
+| **Route Handlers** | `src/app/api/*` | Multipart form-data handling (`POST /api/complaints`), streaming private evidence images (`GET /api/evidence/[id]`), and public JSON endpoints (`GET /api/products/[id]`). |
+| **Domain Services** | `src/services/*` | **Single Source of Truth for Business Rules**: Token hashing, state machine guards, atomic transaction bundling, metric computations, pattern detection. Never duplicated between Route Handlers and Server Actions. |
+| **Client Components** | `src/components/*` (`"use client"`) | UI state, camera previews, dropdown filters, interactive modals, tabs. Contain NO database queries or privileged checks. |
 
 ---
 
-## 4. Distinction Between Allegation and Finding
+## 3. Security & Data Integrity Invariants
 
-A foundational architectural requirement is the strict separation between:
-1. **Allegation (Passenger Complaint)**: Unverified passenger report regarding food quality, packaging condition, or foreign objects.
-2. **Investigation**: Formal inquiry initiated by an authorized quality reviewer, recording timestamps, assigned personnel, and reviewer observations.
-3. **Confirmed Finding**: Official substantiated determination (e.g., "Vendor Packaging Defect", "Temperature Non-Compliance", "Unsubstantiated / Inconclusive").
-4. **Corrective Action**: Contractual or operational remedy imposed on the vendor (e.g., penalty, batch recall, process audit).
+### 3.1 Tracking Token Cryptographic Hashing
+- When a complaint is submitted, the server generates a high-entropy 32-character random token (`crypto.randomBytes(24).toString("base64url")`).
+- The server immediately hashes this token using SHA-256 (`crypto.createHash("sha256").update(token).digest("hex")`).
+- Only `trackingTokenHash` is stored in the database.
+- The raw unhashed token is returned to the passenger **only once** on the submission confirmation card and in the shareable URL.
+- On `/track`, the passenger-submitted token is hashed with SHA-256 and matched against `trackingTokenHash`.
+- Raw tokens are never stored in database tables, never listed in reviewer queues, and never exposed in API payloads.
+
+### 3.2 Train Relationship & Fallback Architecture
+- `Complaint.trainId` links directly to a registered `Train` record (`trainNumber`, `trainName`, origin, destination).
+- When a passenger submits a train number, the service matches it against registered trains.
+- If matched, `trainId` is populated and `unmatchedTrainNumber` is null.
+- If not matched, `unmatchedTrainNumber` stores the raw input and `trainId` is null.
+- UI and analytics resolve: `trainName = complaint.train?.trainName ?? "Unmatched Schedule (" + complaint.unmatchedTrainNumber + ")"`. This avoids duplicate desynchronized train numbers.
+
+### 3.3 Dynamic Overdue Calculation (No Stale Flags)
+- `CorrectiveActionStatus` stores only active stages: `PENDING`, `IN_PROGRESS`, `VERIFIED_COMPLETE`.
+- An action is overdue if and only if `status !== 'VERIFIED_COMPLETE' && deadline < now()`.
+- Dashboard calculations derive overdue counts dynamically, ensuring 100% synchronization with real time.
+
+### 3.4 Atomic Audit Trail & Application Immutability
+- Every status transition, investigator assignment, finding record, and corrective action write is executed within an atomic `prisma.$transaction(...)` alongside the creation of the corresponding `ComplaintEvent`.
+- `ComplaintEvent` records cannot be updated or deleted via application APIs.
+- Reopening a resolved or rejected case back to `UNDER_REVIEW` requires authorized reviewer/admin credentials and appends an immutable event log with justification.
+
+### 3.5 Anonymous Passenger Identity & Role Separation
+- Passengers submit complaints anonymously without account creation.
+- `UserRole` enums are strictly restricted to internal personnel: `QUALITY_REVIEWER` and `ADMIN`.
+- Passenger contact email and phone are purely optional notification channels stored on the complaint record, completely isolated from user accounts.
+- Reviewers and administrators use authenticated sessions with secure, HTTP-only cookies.
 
 ---
 
-## 5. Evidence Isolation Architecture
+## 4. Local Deployment & PostgreSQL Infrastructure
 
-Photographic evidence presents privacy, tampering, and bandwidth concerns:
-- **Never public**: Images are stored in a private object storage bucket (e.g. Supabase Storage / S3).
-- **Authorized access only**: Images are only retrievable through short-lived (e.g., 15-minute) presigned URLs generated server-side for authenticated reviewers.
-- **File Validation**: Image uploads undergo MIME-type inspection, extension validation, and maximum size limits (5MB per image, max 3 images).
+RailGuard standardizes on **PostgreSQL 16**.
+To provide a zero-configuration local demonstration setup without paid cloud services or fragile dual-provider abstractions, the repository includes a standardized `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: railguard-db
+    environment:
+      POSTGRES_USER: railguard
+      POSTGRES_PASSWORD: railguard_secure_password
+      POSTGRES_DB: railguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - railguard_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U railguard -d railguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  railguard_pgdata:
+```
+
+Starting the database requires a single standard command:
+```bash
+docker compose up -d
+```
+All Prisma migrations (`npx prisma migrate dev`) and seed scripts (`npm run db:seed`) execute directly against this container. Remote managed PostgreSQL (e.g. Supabase) is supported simply by pointing `DATABASE_URL` in `.env.local`.
 
 ---
 
-## 6. Audit Trail & Immutability
+## 5. Private Evidence Storage Architecture
 
-Every complaint status change automatically appends a row to the `ComplaintEvent` table:
-- Previous status and new status
-- Actor user ID (or System)
-- Timestamp
-- Reason / explanation
-- `isPublic` flag (distinguishing passenger-visible timeline updates from internal investigation notes)
-
-Complaint events are append-only. No deletion or editing of event history is permitted.
+- **Local Private Storage Adapter**: By default, uploaded evidence images are stored in a non-public server directory (`storage/evidence/`).
+- **Authenticated Streaming Proxy (`/api/evidence/[id]`)**: Images are streamed to the client only after validating:
+  - An active Quality Reviewer or Administrator session cookie, OR
+  - A time-limited (15-minute) cryptographic signed token generated by the server.
+- **MIME & Size Enforcement**: Only `image/jpeg`, `image/png`, and `image/webp` up to 5MB (max 3 images) are accepted. Magic bytes are validated server-side.
+- **Pluggable Cloud Option**: Supabase / S3 private storage can be activated via environment variables without altering domain logic.
