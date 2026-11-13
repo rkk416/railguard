@@ -9,6 +9,8 @@ export const metadata = {
   description: "Passenger food hygiene and quality allegation submission portal.",
 };
 
+export const dynamic = "force-dynamic";
+
 interface ReportPageProps {
   searchParams: Promise<{ p?: string }>;
 }

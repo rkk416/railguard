@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { resolveSession } from "@/lib/auth/session";
 import { verifyEvidenceAccessToken } from "@/lib/crypto/token";
+import { getEvidenceBasePath } from "@/lib/storage/evidenceStorage";
+import { generateDemoSvg } from "@/lib/storage/demoEvidence";
 import fs from "fs";
 import path from "path";
 
@@ -46,7 +48,7 @@ export async function GET(
     }
 
     // Resolve file from private evidence_storage/ (never from public/)
-    const basePath = path.resolve(process.cwd(), "evidence_storage");
+    const basePath = getEvidenceBasePath();
     const filePath = path.resolve(basePath, evidence.storagePath);
 
     // Defense-in-depth: Prevent directory traversal
@@ -54,13 +56,22 @@ export async function GET(
       return NextResponse.json({ error: "Invalid storage path detected" }, { status: 400 });
     }
 
-    if (!fs.existsSync(filePath)) {
+    let fileBuffer: Buffer;
+    if (fs.existsSync(filePath)) {
+      fileBuffer = fs.readFileSync(filePath);
+    } else if (evidence.storagePath.startsWith("demo/")) {
+      // Dynamic fallback for demo SVG assets on serverless/ephemeral instances
+      const demoSvg = generateDemoSvg(
+        evidence.fileName.replace(/\.svg$/, "").replace(/^demo_/, "").replace(/_/g, " "),
+        "SYNTHETIC_SPECIMEN",
+        evidence.id.slice(0, 8).toUpperCase()
+      );
+      fileBuffer = Buffer.from(demoSvg, "utf-8");
+    } else {
       return NextResponse.json({ error: "Evidence asset not found on disk" }, { status: 404 });
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
-
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         "Content-Type": evidence.mimeType || "image/svg+xml",

@@ -23,6 +23,8 @@ interface ComplaintDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: ComplaintDetailPageProps) {
   const { id } = await params;
   const complaint = await prisma.complaint.findUnique({

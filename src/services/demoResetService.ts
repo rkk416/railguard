@@ -5,6 +5,7 @@ import {
   queueEvidenceForCleanup,
   executePostCommitCleanup,
 } from "./evidenceCleanupService";
+import { getUploadsDir } from "@/lib/storage/evidenceStorage";
 import fs from "fs";
 import path from "path";
 
@@ -60,7 +61,7 @@ export async function executeDemoReset(options: DemoResetOptions): Promise<DemoR
   console.log(`[DemoReset] Initiated by Admin (${options.actorId} / ${options.actorEmail})`);
 
   // 3. Find temporary non-demo evidence files on disk to queue for cleanup
-  const uploadsDir = path.resolve(process.cwd(), "evidence_storage", "uploads");
+  const uploadsDir = getUploadsDir();
   const filesToClean: string[] = [];
   if (fs.existsSync(uploadsDir)) {
     const uploadedFiles = fs.readdirSync(uploadsDir);

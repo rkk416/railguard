@@ -8,6 +8,8 @@ export const metadata = {
   description: "Secure, cryptographic passenger complaint tracking portal.",
 };
 
+export const dynamic = "force-dynamic";
+
 interface TrackPageProps {
   searchParams: Promise<{ ref?: string }>;
 }

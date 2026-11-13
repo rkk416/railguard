@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { getDemoDir } from "./evidenceStorage";
 
 export interface DemoEvidenceAsset {
   fileName: string;
@@ -13,7 +14,7 @@ export interface DemoEvidenceAsset {
  * Creates an SVG image buffer for synthetic demonstration evidence.
  * Explicitly branded with "DEMO ASSET — NOT A REAL INCIDENT" to prevent confusion.
  */
-function generateDemoSvg(title: string, category: string, ref: string): string {
+export function generateDemoSvg(title: string, category: string, ref: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -72,7 +73,7 @@ function generateDemoSvg(title: string, category: string, ref: string): string {
  * Returns metadata list of available demonstration files.
  */
 export function ensureDemoEvidenceAssets(): DemoEvidenceAsset[] {
-  const baseStorageDir = path.resolve(process.cwd(), "evidence_storage", "demo");
+  const baseStorageDir = getDemoDir();
   if (!fs.existsSync(baseStorageDir)) {
     fs.mkdirSync(baseStorageDir, { recursive: true });
   }

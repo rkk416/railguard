@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { generateTrackingToken, hashTrackingToken } from "@/lib/crypto/token";
 import { validateEvidenceBuffer } from "@/lib/validation/evidenceFileValidation";
+import { getUploadsDir } from "@/lib/storage/evidenceStorage";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -144,7 +145,7 @@ export async function submitPassengerComplaint(
   const trackingTokenHash = hashTrackingToken(rawTrackingToken); // SHA-256
 
   // 5. Ensure Storage Directory Exists
-  const uploadsDir = path.resolve(process.cwd(), "evidence_storage", "uploads");
+  const uploadsDir = getUploadsDir();
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }

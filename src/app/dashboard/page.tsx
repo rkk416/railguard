@@ -9,6 +9,8 @@ import { RecurringAlertsPanel } from "@/components/dashboard/RecurringAlertsPane
 import { OperationalAnalyticsView } from "@/components/dashboard/OperationalAnalyticsView";
 import { Radio, Database } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 interface DashboardPageProps {
   searchParams: Promise<{
     status?: string;
