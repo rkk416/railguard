@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import { hashTrackingToken } from "@/lib/crypto/token";
 import { ensureDemoEvidenceAssets } from "@/lib/storage/demoEvidence";
+import { hashPassword } from "@/lib/auth/password";
 
 export interface SeedSummary {
   users: number;
@@ -40,16 +41,19 @@ export async function seedRailGuardData(prisma: PrismaClient): Promise<SeedSumma
   const demoAssets = ensureDemoEvidenceAssets();
 
   // 1. Seed Authorized Users (2)
+  const defaultPasswordHash = hashPassword("RailGuard@2026");
+
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@railguard.test" },
     update: {
       name: "Rajesh Kumar (Director, Quality Oversight)",
       role: UserRole.ADMIN,
+      passwordHash: defaultPasswordHash,
     },
     create: {
       email: "admin@railguard.test",
       name: "Rajesh Kumar (Director, Quality Oversight)",
-      passwordHash: "$2a$12$demoAdminHashPlaceholderForDevelopment1234567890",
+      passwordHash: defaultPasswordHash,
       role: UserRole.ADMIN,
     },
   });
@@ -59,11 +63,12 @@ export async function seedRailGuardData(prisma: PrismaClient): Promise<SeedSumma
     update: {
       name: "Priya Sharma (Sr. Catering Inspector)",
       role: UserRole.QUALITY_REVIEWER,
+      passwordHash: defaultPasswordHash,
     },
     create: {
       email: "reviewer@railguard.test",
       name: "Priya Sharma (Sr. Catering Inspector)",
-      passwordHash: "$2a$12$demoReviewerHashPlaceholderForDevelopment1234567890",
+      passwordHash: defaultPasswordHash,
       role: UserRole.QUALITY_REVIEWER,
     },
   });

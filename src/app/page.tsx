@@ -85,6 +85,18 @@ export default function Home() {
               Track
             </Link>
             <Link
+              href="/login"
+              className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono font-medium transition-colors"
+              style={{
+                backgroundColor: "transparent",
+                color: "var(--ink-muted)",
+                border: "1px solid var(--paper-mid)",
+              }}
+              title="Official Railway Staff & Inspector Portal"
+            >
+              <span>Staff Desk</span>
+            </Link>
+            <Link
               href="/dashboard"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors"
               style={{

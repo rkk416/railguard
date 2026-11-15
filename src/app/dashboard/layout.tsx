@@ -1,10 +1,12 @@
 import React from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { UserRole } from "@prisma/client";
 import { RoleSwitcherBar } from "@/components/dashboard/RoleSwitcherBar";
 import { AdminResetModal } from "@/components/dashboard/AdminResetModal";
+import { SignOutButton } from "@/components/dashboard/SignOutButton";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -25,7 +27,11 @@ export default async function DashboardLayout({
 }) {
   // Resolve server-side user identity from cookie
   const cookieStore = await cookies();
-  const sessionEmail = cookieStore.get("railguard_session")?.value || "reviewer@railguard.test";
+  const sessionEmail = cookieStore.get("railguard_session")?.value;
+
+  if (!sessionEmail) {
+    redirect("/login?from=/dashboard");
+  }
 
   let currentUser = null;
   try {
@@ -34,9 +40,7 @@ export default async function DashboardLayout({
     });
 
     if (!currentUser) {
-      currentUser = await prisma.user.findFirst({
-        where: { role: UserRole.QUALITY_REVIEWER },
-      });
+      redirect("/login?from=/dashboard&error=unrecognized");
     }
   } catch (err) {
     console.error("[DashboardLayout] DB query error:", err);
@@ -208,6 +212,7 @@ export default async function DashboardLayout({
               {safeUser.email}
             </div>
           </div>
+          <SignOutButton />
         </div>
       </aside>
 
