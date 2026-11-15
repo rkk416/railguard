@@ -7,6 +7,11 @@ import {
 import { generateTrackingToken, hashTrackingToken } from "@/lib/crypto/token";
 import { validateEvidenceBuffer } from "@/lib/validation/evidenceFileValidation";
 import { getUploadsDir } from "@/lib/storage/evidenceStorage";
+import {
+  isSupabaseStorageConfigured,
+  uploadEvidenceToSupabase,
+  deleteEvidenceFromSupabase,
+} from "@/lib/storage/supabaseStorage";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -152,6 +157,8 @@ export async function submitPassengerComplaint(
 
   // 6. Execute Transaction
   const writtenFiles: string[] = [];
+  const supabaseUploadedPaths: string[] = [];
+  const useSupabase = isSupabaseStorageConfigured();
 
   try {
     const complaint = await prisma.$transaction(async (tx) => {
@@ -181,9 +188,25 @@ export async function submitPassengerComplaint(
         const relativePath = `uploads/${uniqueFileName}`;
         const targetPath = path.join(uploadsDir, uniqueFileName);
 
-        // Write buffer to disk
-        fs.writeFileSync(targetPath, f.buffer);
-        writtenFiles.push(targetPath);
+        // Upload to Supabase Storage if configured
+        if (useSupabase) {
+          const uploadResult = await uploadEvidenceToSupabase(relativePath, f.buffer, f.mimeType);
+          if (!uploadResult.success) {
+            throw new Error(`Failed to upload evidence to secure storage: ${uploadResult.error}`);
+          }
+          supabaseUploadedPaths.push(relativePath);
+        }
+
+        // Write buffer to local/tmp storage as local fallback
+        try {
+          fs.writeFileSync(targetPath, f.buffer);
+          writtenFiles.push(targetPath);
+        } catch {
+          // In read-only serverless filesystems without /tmp permission, continue if Supabase succeeded
+          if (!useSupabase) {
+            throw new Error("Unable to persist evidence asset to storage.");
+          }
+        }
 
         await tx.complaintEvidence.create({
           data: {
@@ -217,11 +240,16 @@ export async function submitPassengerComplaint(
       evidenceCount: validatedFiles.length,
     };
   } catch (err: unknown) {
-    // If database transaction failed, clean up any written files on disk
+    // If database transaction failed, clean up any written files on disk & Supabase
     for (const p of writtenFiles) {
       if (fs.existsSync(p)) {
         try { fs.unlinkSync(p); } catch { /* ignore */ }
       }
+    }
+    if (supabaseUploadedPaths.length > 0) {
+      deleteEvidenceFromSupabase(supabaseUploadedPaths).catch((cleanupErr) => {
+        console.warn("[ComplaintSubmission] Failed to rollback Supabase files:", cleanupErr);
+      });
     }
     throw err;
   }

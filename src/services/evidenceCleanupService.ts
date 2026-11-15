@@ -1,5 +1,9 @@
 import fs from "fs";
 import path from "path";
+import {
+  isSupabaseStorageConfigured,
+  deleteEvidenceFromSupabase,
+} from "@/lib/storage/supabaseStorage";
 
 export interface CleanupTask {
   id: string;
@@ -52,6 +56,13 @@ export async function executePostCommitCleanup(): Promise<{
   for (const task of pending) {
     task.attempts += 1;
     try {
+      // If path is a Supabase Storage path (or relative uploads/ path) and Supabase is configured
+      if (isSupabaseStorageConfigured() && (task.filePath.startsWith("uploads/") || !path.isAbsolute(task.filePath))) {
+        await deleteEvidenceFromSupabase([task.filePath]).catch(() => {
+          /* ignore non-critical storage cleanup errors */
+        });
+      }
+
       const resolvedPath = path.isAbsolute(task.filePath)
         ? task.filePath
         : path.resolve(process.cwd(), task.filePath);

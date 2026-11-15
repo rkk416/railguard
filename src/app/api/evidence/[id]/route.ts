@@ -4,6 +4,10 @@ import { resolveSession } from "@/lib/auth/session";
 import { verifyEvidenceAccessToken } from "@/lib/crypto/token";
 import { getEvidenceBasePath } from "@/lib/storage/evidenceStorage";
 import { generateDemoSvg } from "@/lib/storage/demoEvidence";
+import {
+  isSupabaseStorageConfigured,
+  downloadEvidenceFromSupabase,
+} from "@/lib/storage/supabaseStorage";
 import fs from "fs";
 import path from "path";
 
@@ -56,10 +60,20 @@ export async function GET(
       return NextResponse.json({ error: "Invalid storage path detected" }, { status: 400 });
     }
 
-    let fileBuffer: Buffer;
+    let fileBuffer: Buffer | null = null;
+    let resolvedMimeType = evidence.mimeType || "image/svg+xml";
+
     if (fs.existsSync(filePath)) {
       fileBuffer = fs.readFileSync(filePath);
-    } else if (evidence.storagePath.startsWith("demo/")) {
+    } else if (isSupabaseStorageConfigured()) {
+      const supabaseRes = await downloadEvidenceFromSupabase(evidence.storagePath);
+      if (supabaseRes.success && supabaseRes.buffer) {
+        fileBuffer = supabaseRes.buffer;
+        if (supabaseRes.mimeType) resolvedMimeType = supabaseRes.mimeType;
+      }
+    }
+
+    if (!fileBuffer && evidence.storagePath.startsWith("demo/")) {
       // Dynamic fallback for demo SVG assets on serverless/ephemeral instances
       const demoSvg = generateDemoSvg(
         evidence.fileName.replace(/\.svg$/, "").replace(/^demo_/, "").replace(/_/g, " "),
@@ -67,14 +81,17 @@ export async function GET(
         evidence.id.slice(0, 8).toUpperCase()
       );
       fileBuffer = Buffer.from(demoSvg, "utf-8");
-    } else {
-      return NextResponse.json({ error: "Evidence asset not found on disk" }, { status: 404 });
+      resolvedMimeType = "image/svg+xml";
+    }
+
+    if (!fileBuffer) {
+      return NextResponse.json({ error: "Evidence asset not found on disk or storage" }, { status: 404 });
     }
 
     return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
-        "Content-Type": evidence.mimeType || "image/svg+xml",
+        "Content-Type": resolvedMimeType,
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "X-Content-Type-Options": "nosniff",

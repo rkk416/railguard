@@ -60,13 +60,31 @@ export async function executeDemoReset(options: DemoResetOptions): Promise<DemoR
 
   console.log(`[DemoReset] Initiated by Admin (${options.actorId} / ${options.actorEmail})`);
 
-  // 3. Find temporary non-demo evidence files on disk to queue for cleanup
+  // 3. Find temporary non-demo evidence files (from database and local storage) to queue for cleanup
   const uploadsDir = getUploadsDir();
   const filesToClean: string[] = [];
+
+  try {
+    const dbEvidence = await prisma.complaintEvidence.findMany({
+      where: { storagePath: { startsWith: "uploads/" } },
+      select: { storagePath: true },
+    });
+    for (const row of dbEvidence) {
+      if (!filesToClean.includes(row.storagePath)) {
+        filesToClean.push(row.storagePath);
+      }
+    }
+  } catch {
+    /* ignore if DB query fails prior to wipe */
+  }
+
   if (fs.existsSync(uploadsDir)) {
     const uploadedFiles = fs.readdirSync(uploadsDir);
     for (const f of uploadedFiles) {
-      filesToClean.push(path.join(uploadsDir, f));
+      const fullPath = path.join(uploadsDir, f);
+      if (!filesToClean.includes(fullPath)) {
+        filesToClean.push(fullPath);
+      }
     }
   }
 

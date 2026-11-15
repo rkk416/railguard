@@ -1,0 +1,58 @@
+# ==============================================================================
+# RailGuard — Render Blueprint Specification
+# Web Service: Single Full-Stack Next.js 16 Application (App Router + React 19)
+# Database: Supabase PostgreSQL (via Session Pooler / Direct URL)
+# Object Storage: Supabase Storage (Private Bucket: railguard-evidence)
+# Tier: Free Tier Compatible
+# ==============================================================================
+
+services:
+  - type: web
+    name: railguard
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: .
+    buildCommand: npm install && npx prisma migrate deploy && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Supabase PostgreSQL Connection Strings
+      # DATABASE_URL: Session Pooler URI (IPv4 compatible, Port 5432)
+      - key: DATABASE_URL
+        sync: false
+
+      # DIRECT_URL: Direct Connection URI for Prisma Migrations (Port 5432)
+      - key: DIRECT_URL
+        sync: false
+
+      # Supabase Private Storage Bucket Credentials
+      - key: SUPABASE_URL
+        sync: false
+
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      - key: SUPABASE_STORAGE_BUCKET
+        value: railguard-evidence
+
+      # Cryptographic & Session Secrets (Render generates strong secrets automatically)
+      - key: SESSION_SECRET
+        generateValue: true
+
+      - key: EVIDENCE_TOKEN_SECRET
+        generateValue: true
+
+      - key: DEMO_RESET_ADMIN_SECRET
+        generateValue: true
+
+      # Production Safety Guards
+      - key: ALLOW_DEMO_RESET
+        value: "false"
+
+      # Public Application Canonical URL (e.g. https://railguard.onrender.com)
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false

@@ -179,35 +179,35 @@ npm run build
 
 ---
 
-## 8. Production Deployment Guide (Vercel + Neon / Supabase)
+## 8. Production Deployment Guide (Render Blueprint + Supabase)
 
-RailGuard is fully optimized for zero-configuration deployment to [Vercel](https://vercel.com) paired with a serverless PostgreSQL provider such as [Neon](https://neon.tech) or [Supabase](https://supabase.com).
+RailGuard is configured for automated one-click deployment to **Render** via Render Blueprint (`render.yaml`), integrated with **Supabase PostgreSQL** and **Supabase Storage**.
 
-### Step 1: Provision PostgreSQL
-1. Create a serverless PostgreSQL database on **Neon** or **Supabase**.
-2. Retrieve the pooled connection string (for `DATABASE_URL`) and direct connection string (for `DIRECT_URL`).
+### Step 1: Provision Supabase
+1. Create a project at [Supabase](https://supabase.com).
+2. Retrieve the **Session Pooler** URI (`DATABASE_URL`) and **Direct Connection** URI (`DIRECT_URL`) under `Settings -> Database`.
+3. In `Storage`, create a new **Private** bucket named `railguard-evidence`.
+4. In `Settings -> API`, copy the **Project URL** (`SUPABASE_URL`) and the **`service_role`** secret key (`SUPABASE_SERVICE_ROLE_KEY`).
 
-### Step 2: Deploy to Vercel
-1. Import your GitHub repository into the Vercel dashboard.
-2. In the **Environment Variables** section, configure:
-   - `DATABASE_URL`: Your pooled PostgreSQL connection string with `?pgbouncer=true` (or Neon pooled string).
-   - `DIRECT_URL`: Direct PostgreSQL connection string without pooler (for migrations).
-   - `NEXT_PUBLIC_APP_URL`: Your production URL (e.g. `https://railguard.vercel.app`).
-   - `AUTH_SECRET`: Random 32+ character hex or base64 secret (`openssl rand -base64 32`).
-   - `SESSION_SECRET`: Random 32+ character string.
-   - `EVIDENCE_TOKEN_SECRET`: Random 32+ character string.
-   - `DEMO_RESET_ADMIN_SECRET`: Dedicated secret key for administrative automation.
-   - `ALLOW_DEMO_RESET`: Set to `"false"` in production.
-3. In **Build & Development Settings**:
-   - Build Command: `npm run build` (Note: `postinstall: prisma generate` ensures Prisma Client is compiled).
-4. Click **Deploy**.
+### Step 2: Deploy to Render via Blueprint
+1. Push your repository to GitHub.
+2. In the [Render Dashboard](https://dashboard.render.com), click **New +** $\rightarrow$ **Blueprint**.
+3. Connect your repository. Render automatically reads `render.yaml`.
+4. Render will auto-generate all cryptographic secrets and prompt you to enter the 5 required connection values:
+   - `DATABASE_URL` (Supabase Session Pooler URI)
+   - `DIRECT_URL` (Supabase Direct Connection URI)
+   - `SUPABASE_URL` (Supabase Project URL)
+   - `SUPABASE_SERVICE_ROLE_KEY` (Supabase `service_role` secret key)
+   - `NEXT_PUBLIC_APP_URL` (Render web service URL e.g. `https://railguard.onrender.com`)
+5. Click **Apply**. Render will run migrations, generate the Prisma client, compile the Next.js production build, and launch the service with live health monitoring at `/api/health`.
 
-### Step 3: Run Migrations and Seed
-From your local terminal connected to the production database:
+### Step 3: Seed Demonstration Baseline (Optional)
+To load the realistic 35-complaint demonstration dataset into your Supabase database:
 ```bash
-DATABASE_URL="<production-db-url>" DIRECT_URL="<production-direct-url>" npx prisma migrate deploy
-DATABASE_URL="<production-db-url>" npx tsx prisma/seed.ts
+DATABASE_URL="<your-supabase-session-pooler-url>" DIRECT_URL="<your-supabase-direct-url>" npm run db:seed
 ```
+
+See [**`docs/DEPLOYMENT.md`**](./docs/DEPLOYMENT.md) for the complete step-by-step walkthrough and configuration checklist.
 
 ---
 
