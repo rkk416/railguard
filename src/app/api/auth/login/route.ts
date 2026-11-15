@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
+import { createSessionToken } from "@/lib/auth/sessionToken";
 import { checkRateLimit } from "@/lib/validation/rateLimiter";
 import { z } from "zod";
 
@@ -8,6 +9,13 @@ const loginSchema = z.object({
   email: z.string().email("Please enter a valid work email address").trim().toLowerCase(),
   password: z.string().min(1, "Password is required"),
 });
+
+// Generic authentication error message to prevent account enumeration
+const GENERIC_AUTH_ERROR = "Invalid staff credentials or account not recognized.";
+
+// Dummy hash for constant-time comparison when user is not found
+const DUMMY_SCRYPT_HASH =
+  "scrypt$16384,8,1$00000000000000000000000000000000$00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,22 +48,31 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parseResult.data;
 
-    // 3. User lookup
+    // 3. User lookup through Prisma
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     // 4. Constant-time / timing-safe credential verification
-    const isValid = user ? verifyPassword(password, user.passwordHash) : false;
+    // Even if user does not exist, compute verifyPassword to prevent timing-based user enumeration
+    const targetHash = user?.passwordHash || DUMMY_SCRYPT_HASH;
+    const isValid = verifyPassword(password, targetHash);
 
     if (!user || !isValid) {
       return NextResponse.json(
-        { error: "Invalid staff credentials or account not recognized." },
+        { error: GENERIC_AUTH_ERROR },
         { status: 401 }
       );
     }
 
-    // 5. Successful authentication response with secure HTTP-only cookie
+    // 5. Generate tamper-proof signed session token
+    const token = createSessionToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    // 6. Build response with secure HTTP-only cookie
     const response = NextResponse.json(
       {
         success: true,
@@ -70,13 +87,12 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-    // Set HTTP-Only, Secure, SameSite=Lax session cookie
-    response.cookies.set("railguard_session", user.email, {
+    response.cookies.set("railguard_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24, // 24 hours
+      maxAge: 12 * 60 * 60, // 12 hours
     });
 
     return response;

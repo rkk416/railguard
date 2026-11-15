@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { UserRole } from "@prisma/client";
+import { verifySessionToken } from "./sessionToken";
 
 export interface AuthenticatedUser {
   id: string;
@@ -17,7 +18,7 @@ export interface SessionResult {
 
 /**
  * Server-enforced session resolution.
- * Inspects cookies and authorization headers, resolving the actor against the database.
+ * Inspects signed cookies and authorization headers, resolving the actor against the database.
  * Client claims are NEVER trusted blindly without DB validation.
  */
 export async function resolveSession(req: NextRequest): Promise<SessionResult> {
@@ -42,11 +43,9 @@ export async function resolveSession(req: NextRequest): Promise<SessionResult> {
       }
     }
 
-    // 2. Check session cookie
+    // 2. Check signed session cookie
     const sessionCookie = req.cookies.get("railguard_session")?.value;
-    const targetEmail = sessionCookie;
-
-    if (!targetEmail) {
+    if (!sessionCookie) {
       return {
         authenticated: false,
         user: null,
@@ -54,16 +53,35 @@ export async function resolveSession(req: NextRequest): Promise<SessionResult> {
       };
     }
 
-    // 3. Resolve user from database to ensure valid status and server-enforced role
+    // 3. Cryptographically verify token signature and expiry
+    const tokenPayload = verifySessionToken(sessionCookie);
+    if (!tokenPayload) {
+      return {
+        authenticated: false,
+        user: null,
+        error: "Invalid or expired session token",
+      };
+    }
+
+    // 4. Resolve user from database to ensure valid status and server-enforced role
     const user = await prisma.user.findUnique({
-      where: { email: targetEmail },
+      where: { id: tokenPayload.userId },
     });
 
     if (!user) {
       return {
         authenticated: false,
         user: null,
-        error: "User account not recognized",
+        error: "User account not recognized or revoked",
+      };
+    }
+
+    // Ensure database role strictly matches token claim
+    if (user.role !== tokenPayload.role) {
+      return {
+        authenticated: false,
+        user: null,
+        error: "User role mismatch or permissions altered",
       };
     }
 

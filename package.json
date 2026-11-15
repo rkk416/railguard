@@ -13,11 +13,14 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:demo": "tsx prisma/seed.ts"
+    "db:seed:demo": "tsx prisma/seed.ts",
+    "staff:provision": "tsx scripts/provisionStaff.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@tailwindcss/postcss": "^4.3.5",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.64.0",
     "next": "16.4.3",

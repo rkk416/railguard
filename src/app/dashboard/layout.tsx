@@ -15,6 +15,8 @@ import {
   FileText,
 } from "lucide-react";
 
+import { verifySessionToken } from "@/lib/auth/sessionToken";
+
 export const metadata = {
   title: "Control Room Dashboard — RailGuard",
   description: "Centralized railway food quality audit and complaint triage console.",
@@ -25,40 +27,38 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Resolve server-side user identity from cookie
+  // Resolve server-side user identity from cryptographically signed session cookie
   const cookieStore = await cookies();
-  const sessionEmail = cookieStore.get("railguard_session")?.value;
+  const sessionToken = cookieStore.get("railguard_session")?.value;
 
-  if (!sessionEmail) {
+  if (!sessionToken) {
+    redirect("/login?from=/dashboard");
+  }
+
+  const tokenPayload = verifySessionToken(sessionToken);
+  if (!tokenPayload) {
     redirect("/login?from=/dashboard");
   }
 
   let currentUser = null;
   try {
     currentUser = await prisma.user.findUnique({
-      where: { email: sessionEmail },
+      where: { id: tokenPayload.userId },
     });
-
-    if (!currentUser) {
-      redirect("/login?from=/dashboard&error=unrecognized");
-    }
   } catch (err) {
     console.error("[DashboardLayout] DB query error:", err);
   }
 
-  const safeUser = currentUser
-    ? {
-        id: currentUser.id,
-        email: currentUser.email,
-        name: currentUser.name,
-        role: currentUser.role,
-      }
-    : {
-        id: "demo-fallback-id",
-        email: "reviewer@railguard.test",
-        name: "Priya Sharma (Sr. Catering Inspector)",
-        role: UserRole.QUALITY_REVIEWER,
-      };
+  if (!currentUser || currentUser.role !== tokenPayload.role) {
+    redirect("/login?from=/dashboard");
+  }
+
+  const safeUser = {
+    id: currentUser.id,
+    email: currentUser.email,
+    name: currentUser.name,
+    role: currentUser.role,
+  };
 
   const isAdmin = safeUser.role === UserRole.ADMIN;
 

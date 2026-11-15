@@ -11,8 +11,6 @@ import {
   ArrowRight,
   ShieldAlert,
   Loader2,
-  CheckCircle2,
-  UserCheck,
   Shield,
   ArrowLeft,
 } from "lucide-react";
@@ -27,20 +25,10 @@ export function StaffLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // Quick evaluation preset fill
-  const handlePresetSelect = (presetEmail: string, presetName: string, roleTitle: string) => {
-    setEmail(presetEmail);
-    setPassword("RailGuard@2026");
-    setError(null);
-    setSuccessMessage(`Loaded ${presetName} credentials (${roleTitle})`);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccessMessage(null);
 
     if (!email.trim()) {
       setError("Please enter your registered staff email address.");
@@ -60,131 +48,82 @@ export function StaffLoginForm() {
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error || "Authentication failed. Please verify credentials.");
+        setError(data.error || "Invalid staff credentials or account not recognized.");
         setLoading(false);
         return;
       }
 
-      setSuccessMessage(`Authorized as ${data.user.name} (${data.user.role}). Redirecting...`);
-
-      // Smooth transition to dashboard
-      setTimeout(() => {
-        router.push(data.redirectTo || redirectTarget);
-        router.refresh();
-      }, 400);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Network error during authentication";
-      setError(msg);
+      // Successful authentication: navigate to protected destination
+      router.push(redirectTarget);
+      router.refresh();
+    } catch (err) {
+      console.error("[StaffLoginForm] Network error:", err);
+      setError("Network or server connection failed. Please verify your connection.");
       setLoading(false);
     }
   };
 
   return (
     <div
-      className="flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-12 h-full"
+      className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16"
       style={{
         backgroundColor: "var(--archive-paper)",
         color: "var(--rail-ink)",
       }}
     >
-      <div className="max-w-md w-full mx-auto space-y-8">
-        {/* Mobile Header Brand (visible when split layout stacks) */}
-        <div className="lg:hidden flex items-center justify-between border-b pb-4 mb-2" style={{ borderColor: "var(--paper-mid)" }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded flex items-center justify-center font-bold text-xs font-mono" style={{ backgroundColor: "var(--jade)", color: "white" }}>
-              RG
-            </div>
-            <div>
-              <span className="font-mono font-bold text-sm" style={{ color: "var(--rail-ink)" }}>RAILGUARD</span>
-              <span className="block text-[9px] font-mono uppercase tracking-widest" style={{ color: "var(--brass)" }}>Inspection Register</span>
-            </div>
-          </div>
-          <Link href="/" className="text-xs font-mono flex items-center gap-1 opacity-75 hover:opacity-100" style={{ color: "var(--rail-ink)" }}>
-            <ArrowLeft className="w-3 h-3" />
-            <span>Public Home</span>
+      <div className="w-full max-w-md mx-auto space-y-8">
+        {/* Navigation Return Link */}
+        <div>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-mono transition-colors hover:underline"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Public Portal</span>
           </Link>
         </div>
 
-        {/* Section Title */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "var(--jade)" }} />
-            <span className="text-[11px] font-mono uppercase tracking-widest" style={{ color: "var(--ink-muted)" }}>
-              STAFF AUTHENTICATION DESK
-            </span>
-          </div>
-          <h2 className="text-3xl font-serif font-bold tracking-tight" style={{ color: "var(--rail-ink)" }}>
-            Welcome back.
-          </h2>
-          <p className="text-sm" style={{ color: "var(--ink-muted)" }}>
-            Access the RailGuard inspection workspace and quality triage console.
-          </p>
-        </div>
-
-        {/* Evaluation Demo Credentials Helper */}
-        <div
-          className="p-3.5 rounded border space-y-2.5"
-          style={{
-            backgroundColor: "#FAF8F5",
-            borderColor: "var(--paper-mid)",
-          }}
-        >
+        {/* Header Register Identity */}
+        <div className="space-y-2 border-b pb-6" style={{ borderColor: "var(--paper-mid)" }}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-semibold" style={{ color: "var(--brass)" }}>
-              DEMONSTRATION ACCESS ROSTER:
+            <span
+              className="font-mono text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded"
+              style={{
+                backgroundColor: "var(--paper-mid)",
+                color: "var(--ink-muted)",
+              }}
+            >
+              [AUTH-REG-01]
             </span>
-            <span className="text-[10px] font-mono text-emerald-800 font-medium">Click to fill</span>
+            <div
+              className="flex items-center gap-1 text-[11px] font-mono"
+              style={{ color: "var(--jade)" }}
+            >
+              <Shield className="w-3 h-3" />
+              <span>TLS 1.3 / STRICT RBAC</span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {/* Reviewer Chip */}
-            <button
-              type="button"
-              onClick={() => handlePresetSelect("reviewer@railguard.test", "Priya Sharma", "Senior Inspector")}
-              className="text-left p-2 rounded border transition-all text-xs cursor-pointer hover:shadow-xs group"
-              style={{
-                backgroundColor: email === "reviewer@railguard.test" ? "rgba(82, 124, 114, 0.1)" : "white",
-                borderColor: email === "reviewer@railguard.test" ? "var(--jade)" : "var(--paper-mid)",
-              }}
-            >
-              <div className="flex items-center gap-1.5 font-semibold" style={{ color: "var(--jade)" }}>
-                <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Inspector Priya S.</span>
-              </div>
-              <div className="text-[10px] font-mono truncate opacity-75 mt-0.5" style={{ color: "var(--ink-muted)" }}>
-                reviewer@railguard.test
-              </div>
-            </button>
-
-            {/* Admin Chip */}
-            <button
-              type="button"
-              onClick={() => handlePresetSelect("admin@railguard.test", "Rajesh Kumar", "Director")}
-              className="text-left p-2 rounded border transition-all text-xs cursor-pointer hover:shadow-xs group"
-              style={{
-                backgroundColor: email === "admin@railguard.test" ? "rgba(178, 141, 85, 0.1)" : "white",
-                borderColor: email === "admin@railguard.test" ? "var(--brass)" : "var(--paper-mid)",
-              }}
-            >
-              <div className="flex items-center gap-1.5 font-semibold" style={{ color: "var(--brass)" }}>
-                <Shield className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Director Rajesh K.</span>
-              </div>
-              <div className="text-[10px] font-mono truncate opacity-75 mt-0.5" style={{ color: "var(--ink-muted)" }}>
-                admin@railguard.test
-              </div>
-            </button>
-          </div>
+          <h2
+            className="font-serif text-2xl sm:text-3xl font-bold tracking-tight pt-1"
+            style={{ color: "var(--rail-ink)" }}
+          >
+            Staff Authentication Desk
+          </h2>
+          <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+            Official railway food quality inspection and control room register. Enter your designated staff credentials to access the inspection register.
+          </p>
         </div>
 
         {/* Error Banner */}
         {error && (
           <div
             role="alert"
-            className="p-3 rounded border text-xs flex items-start gap-2.5 animate-fadeIn"
+            className="p-3.5 rounded border text-xs flex items-start gap-2.5 animate-fadeIn"
             style={{
               backgroundColor: "rgba(198, 95, 72, 0.08)",
               borderColor: "var(--signal-red)",
@@ -196,23 +135,8 @@ export function StaffLoginForm() {
           </div>
         )}
 
-        {/* Success Banner */}
-        {successMessage && (
-          <div
-            className="p-3 rounded border text-xs flex items-start gap-2.5 animate-fadeIn"
-            style={{
-              backgroundColor: "rgba(82, 124, 114, 0.1)",
-              borderColor: "var(--jade)",
-              color: "var(--jade)",
-            }}
-          >
-            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1 font-medium">{successMessage}</div>
-          </div>
-        )}
-
         {/* Main Authentication Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email Input */}
           <div className="space-y-1.5">
             <label
@@ -223,7 +147,10 @@ export function StaffLoginForm() {
               Work Email Address
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" style={{ color: "var(--ink-faint)" }}>
+              <div
+                className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+                style={{ color: "var(--ink-faint)" }}
+              >
                 <Mail className="w-4 h-4" />
               </div>
               <input
@@ -233,7 +160,7 @@ export function StaffLoginForm() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="inspector@railguard.test"
+                placeholder="officer@railway.gov.in"
                 disabled={loading}
                 className="w-full pl-9 pr-3 py-2.5 text-sm rounded border bg-white focus:outline-hidden transition-all font-mono"
                 style={{
@@ -254,12 +181,12 @@ export function StaffLoginForm() {
               >
                 Inspection Key / Password
               </label>
-              <span className="text-[10px] font-mono opacity-60" style={{ color: "var(--ink-faint)" }}>
-                Standard bcrypt/scrypt
-              </span>
             </div>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" style={{ color: "var(--ink-faint)" }}>
+              <div
+                className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+                style={{ color: "var(--ink-faint)" }}
+              >
                 <Lock className="w-4 h-4" />
               </div>
               <input
@@ -318,13 +245,16 @@ export function StaffLoginForm() {
           className="pt-6 border-t space-y-3 text-center"
           style={{ borderColor: "var(--paper-mid)" }}
         >
-          <div className="flex items-center justify-center gap-2 text-[11px] font-mono" style={{ color: "var(--ink-faint)" }}>
+          <div
+            className="flex items-center justify-center gap-2 text-[11px] font-mono"
+            style={{ color: "var(--ink-faint)" }}
+          >
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--brass)" }} />
             <span>Authorized railway personnel only</span>
           </div>
 
           <p className="text-[11px] leading-relaxed max-w-sm mx-auto" style={{ color: "var(--ink-faint)" }}>
-            Official railway food safety inspection console. All access sessions are logged with cryptographic timestamps in compliance with RailGuard quality audit protocols.
+            Official railway food safety inspection console. Staff credentials are provisioned by Central IT Operations. All access sessions are logged with cryptographic timestamps in compliance with RailGuard quality audit protocols.
           </p>
 
           <div className="pt-2">
