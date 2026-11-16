@@ -187,15 +187,27 @@ export function ComplaintReportingForm({
         throw new Error(data.error || "Submission failed");
       }
 
+      const complaintRef = data.complaintRef || data.complaint?.complaintRef;
+      const trackingToken = data.trackingToken;
+      const createdAt = data.createdAt || data.complaint?.createdAt;
+
+      if (!complaintRef || typeof complaintRef !== "string") {
+        throw new Error("Submission was received, but no valid complaint reference was returned by the server.");
+      }
+
+      if (!trackingToken || typeof trackingToken !== "string") {
+        throw new Error("Submission was received, but no secret tracking token was returned by the server.");
+      }
+
       setSubmissionResult({
-        complaintRef: data.complaint.complaintRef,
-        trackingToken: data.trackingToken,
-        createdAt: data.complaint.createdAt,
+        complaintRef,
+        trackingToken,
+        createdAt: createdAt || new Date().toISOString(),
       });
 
       // Cache token in sessionStorage so user doesn't lose it if they click Track
       try {
-        sessionStorage.setItem(`rg_token_${data.complaint.complaintRef}`, data.trackingToken);
+        sessionStorage.setItem(`rg_token_${complaintRef}`, trackingToken);
       } catch {
         // ignore storage error
       }
