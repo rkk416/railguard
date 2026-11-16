@@ -158,7 +158,7 @@ export default function Home() {
               {/* Three prominent actions */}
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <Link
-                  href="/"
+                  href="#packaging-lookup"
                   className="card-lift flex items-center justify-between gap-3 px-5 py-4 rounded-lg border group"
                   style={{
                     backgroundColor: "var(--rail-ink)",
@@ -232,7 +232,8 @@ export default function Home() {
 
       {/* ── QR / Packaging Lookup ── */}
       <section
-        className="py-10"
+        id="packaging-lookup"
+        className="py-10 scroll-mt-16"
         style={{
           backgroundColor: "white",
           borderBottom: "1px solid var(--paper-mid)",

@@ -1,24 +1,29 @@
 import { prisma } from "@/lib/db/prisma";
+import { parseQrContent } from "@/lib/qr/parser";
 import type { VerifiedProductDetails } from "@/types";
 
 /**
- * Looks up and verifies a packaging unit by its unique QR identifier.
- * Distinguishes between verified records, expired batches, recalled products,
+ * Looks up and verifies a packaging unit by its unique QR identifier or scanned URL.
+ * Distinguishes between verified active records, expired batches, recalled products,
  * and unrecognized identifiers.
  */
 export async function verifyPackagingUnit(
   identifier: string
 ): Promise<VerifiedProductDetails> {
-  const cleanId = identifier?.trim();
+  const parseResult = parseQrContent(identifier);
 
-  if (!cleanId) {
+  if (!parseResult.valid || !parseResult.identifier) {
     return {
       status: "UNRECOGNIZED",
       isRecognized: false,
       isDemonstrationData: true,
-      message: "No packaging identifier was provided.",
+      message:
+        parseResult.error ||
+        "No packaging identifier was provided. Please verify the QR code and try again.",
     };
   }
+
+  const cleanId = parseResult.identifier;
 
   try {
     const packagingUnit = await prisma.packagingUnit.findUnique({

@@ -156,6 +156,15 @@ export default async function DashboardLayout({
           </Link>
 
           <Link
+            href="/dashboard/packaging"
+            className="flex items-center gap-2.5 px-3 py-2 rounded transition-colors hover:bg-white/5"
+            style={{ color: "rgba(240,237,228,0.7)" }}
+          >
+            <QrCode className="w-4 h-4" style={{ color: "var(--jade)" }} />
+            <span>Packaging &amp; QR Registry</span>
+          </Link>
+
+          <Link
             href="/report"
             className="flex items-center gap-2.5 px-3 py-2 rounded transition-colors hover:bg-white/5"
             style={{ color: "rgba(240,237,228,0.7)" }}
@@ -165,12 +174,12 @@ export default async function DashboardLayout({
           </Link>
 
           <Link
-            href="/"
+            href="/#packaging-lookup"
             className="flex items-center gap-2.5 px-3 py-2 rounded transition-colors hover:bg-white/5"
             style={{ color: "rgba(240,237,228,0.7)" }}
           >
             <QrCode className="w-4 h-4" style={{ color: "rgba(240,237,228,0.5)" }} />
-            <span>Packaging Lookup</span>
+            <span>Public Scanner View</span>
           </Link>
         </nav>
 

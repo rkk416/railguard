@@ -16,7 +16,9 @@ import {
   ExternalLink,
   Train,
   Send,
+  Camera,
 } from "lucide-react";
+import { CameraQrScanner } from "@/components/qr/CameraQrScanner";
 
 interface PackagingVerificationInfo {
   status: "VERIFIED" | "EXPIRED" | "RECALLED" | "UNRECOGNIZED";
@@ -52,6 +54,7 @@ export function ComplaintReportingForm({
   const [qrCode, setQrCode] = useState(initialQrCode);
   const [isVerifyingQr, setIsVerifyingQr] = useState(false);
   const [verificationResult, setVerificationResult] = useState<PackagingVerificationInfo | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Form Fields
   const [category, setCategory] = useState<ComplaintCategory>(ComplaintCategory.SPOILAGE);
@@ -386,6 +389,20 @@ export function ComplaintReportingForm({
           />
           <button
             type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="px-3 py-2 rounded text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer border"
+            style={{
+              backgroundColor: "var(--jade)",
+              borderColor: "#3d5e56",
+              color: "white",
+            }}
+            title="Scan packaging QR code with camera"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Camera</span>
+          </button>
+          <button
+            type="button"
             disabled={isVerifyingQr || !qrCode.trim()}
             onClick={() => verifyPackaging(qrCode)}
             className="px-3.5 py-2 rounded text-xs font-semibold disabled:opacity-40 transition-colors cursor-pointer"
@@ -397,6 +414,16 @@ export function ComplaintReportingForm({
             {isVerifyingQr ? "Checking..." : "Verify"}
           </button>
         </div>
+
+        {/* Camera Scanner Dialog */}
+        <CameraQrScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScanSuccess={(scannedId) => {
+            setQrCode(scannedId);
+            verifyPackaging(scannedId);
+          }}
+        />
 
         {/* Verification Result Badge & Card */}
         {verificationResult && (
