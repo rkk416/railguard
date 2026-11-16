@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { UserRole } from "@prisma/client";
 import { RoleSwitcherBar } from "@/components/dashboard/RoleSwitcherBar";
 import { AdminResetModal } from "@/components/dashboard/AdminResetModal";
+import { ChangePasswordModal } from "@/components/dashboard/ChangePasswordModal";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
 import {
   LayoutDashboard,
@@ -193,24 +194,27 @@ export default async function DashboardLayout({
 
           {/* User Badge */}
           <div
-            className="p-2.5 rounded border"
+            className="p-2.5 rounded border space-y-2"
             style={{
               backgroundColor: "rgba(255,255,255,0.04)",
               borderColor: "rgba(240,237,228,0.12)",
             }}
           >
-            <div
-              className="text-[11px] font-semibold truncate"
-              style={{ color: "var(--archive-paper)" }}
-            >
-              {safeUser.name}
+            <div>
+              <div
+                className="text-[11px] font-semibold truncate"
+                style={{ color: "var(--archive-paper)" }}
+              >
+                {safeUser.name}
+              </div>
+              <div
+                className="text-[10px] font-mono truncate"
+                style={{ color: "rgba(240,237,228,0.5)" }}
+              >
+                {safeUser.email}
+              </div>
             </div>
-            <div
-              className="text-[10px] font-mono truncate"
-              style={{ color: "rgba(240,237,228,0.5)" }}
-            >
-              {safeUser.email}
-            </div>
+            <ChangePasswordModal />
           </div>
           <SignOutButton />
         </div>

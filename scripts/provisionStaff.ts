@@ -167,25 +167,7 @@ export async function executeProvisioningFlow() {
     process.exit(1);
   }
 
-  // 3. Resolve Full Name
-  let name = cliArgs.name;
-  if (!name) {
-    name = await promptText(
-      existingUser
-        ? `Full Name [press Enter to keep "${existingUser.name}"]: `
-        : "Full Name (e.g. Priya Sharma): "
-    );
-    if (!name && existingUser) {
-      name = existingUser.name;
-    }
-  }
-  name = name.trim();
-  if (!name) {
-    console.error("[Error] Staff member full name is required.");
-    process.exit(1);
-  }
-
-  // 4. Resolve and Validate Role
+  // 3. Resolve and Validate Role First
   let role: UserRole | null = null;
   if (cliArgs.role) {
     role = validateRole(cliArgs.role);
@@ -194,10 +176,12 @@ export async function executeProvisioningFlow() {
   if (!role) {
     const rolePrompt = existingUser
       ? `Role (1 = ADMIN, 2 = QUALITY_REVIEWER) [press Enter to keep "${existingUser.role}"]: `
-      : "Role (1 = ADMIN, 2 = QUALITY_REVIEWER): ";
+      : "Role (1 = ADMIN, 2 = QUALITY_REVIEWER) [Default: 2]: ";
     const roleInput = await promptText(rolePrompt);
     if (!roleInput && existingUser) {
       role = existingUser.role;
+    } else if (!roleInput) {
+      role = UserRole.QUALITY_REVIEWER;
     } else {
       role = validateRole(roleInput);
     }
@@ -205,8 +189,8 @@ export async function executeProvisioningFlow() {
 
   if (!role) {
     console.error("\n[Error] Invalid role. Allowed roles in RailGuard schema:");
-    console.error("  - ADMIN (Director / Lead Quality Auditor)");
-    console.error("  - QUALITY_REVIEWER (On-train / Station Catering Inspector)");
+    console.error("  - ADMIN (RailGuard System Administrator)");
+    console.error("  - QUALITY_REVIEWER (RailGuard Quality Reviewer)");
     process.exit(1);
   }
 
@@ -216,6 +200,18 @@ export async function executeProvisioningFlow() {
     console.error(`To explicitly permit administrative privilege demotion, pass --allow-demotion.`);
     process.exit(1);
   }
+
+  // 4. Resolve Full Name
+  const defaultName = role === UserRole.ADMIN ? "RailGuard System Administrator" : "RailGuard Quality Reviewer";
+  let name = cliArgs.name;
+  if (!name) {
+    const defaultSuggestion = existingUser ? existingUser.name : defaultName;
+    name = await promptText(`Full Name [Default: "${defaultSuggestion}"]: `);
+    if (!name) {
+      name = defaultSuggestion;
+    }
+  }
+  name = name.trim();
 
   // 5. Secure Password Entry (Never displayed or recorded in shell history)
   let password = cliArgs.password;

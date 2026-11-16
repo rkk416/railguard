@@ -14,7 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx prisma/seed.ts",
-    "staff:provision": "tsx scripts/provisionStaff.ts"
+    "staff:provision": "tsx scripts/provisionStaff.ts",
+    "staff:bootstrap": "tsx scripts/bootstrapStaff.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
